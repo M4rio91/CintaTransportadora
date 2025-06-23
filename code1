@@ -1,0 +1,124 @@
+/*
+ * Proyecto: Cinta transportadora con llenadora de líquidos
+ * Componentes:
+ * - 2 módulos L298N (motor DC y bomba de agua)
+ * - 2 sensores HW201 (infrarrojos)
+ * 
+ * Funcionamiento:
+ * 1. Motor DC funciona hasta que Sensor1 detecta objeto
+ * 2. Se detiene motor DC, espera 3 segundos
+ * 3. Activa bomba de agua por 4 segundos
+ * 4. Se detiene bomba, espera 2 segundos
+ * 5. Reactiva motor DC hasta que Sensor2 detecta el objeto
+ */
+
+// Pines para el motor DC (cinta transportadora)
+const byte ENA_motor = 10;
+const byte IN1_motor = 8;
+const byte IN2_motor = 9;
+
+// Pines para la bomba de agua
+const byte ENA_bomba = 6;
+const byte IN1_bomba = 5;
+const byte IN2_bomba = 4;
+
+// Pines para los sensores HW201 (infrarrojos)
+const byte sensor1 = 2;
+const byte sensor2 = 3;
+
+// Tiempos en milisegundos
+const unsigned long TIEMPO_ESPERA_SENSOR = 3000;
+const unsigned long TIEMPO_LLENADO = 4000;
+const unsigned long TIEMPO_POST_LLENADO = 2000;
+const unsigned long TIEMPO_POST_SENSOR2 = 1000;
+
+void setup() {
+  // Configurar salidas del motor
+  pinMode(ENA_motor, OUTPUT);
+  pinMode(IN1_motor, OUTPUT);
+  pinMode(IN2_motor, OUTPUT);
+
+  // Configurar salidas de la bomba
+  pinMode(ENA_bomba, OUTPUT);
+  pinMode(IN1_bomba, OUTPUT);
+  pinMode(IN2_bomba, OUTPUT);
+
+  // Configurar entradas de sensores
+  pinMode(sensor1, INPUT);
+  pinMode(sensor2, INPUT);
+
+  // Iniciar comunicación serial
+  Serial.begin(9600);
+  Serial.println("Sistema iniciado. Esperando objeto...");
+
+  // Iniciar con el motor encendido
+  activarMotorDC();
+}
+
+void loop() {
+  bool detectado1 = !digitalRead(sensor1); // Infrarrojo activo en LOW
+  bool detectado2 = !digitalRead(sensor2);
+
+  if (detectado1 && !detectado2) {
+    Serial.println("Objeto detectado en Sensor 1.");
+    procesoLlenado();
+    esperarSensorFinal();
+    Serial.println("Listo para próximo objeto.");
+    activarMotorDC();
+  }
+}
+
+// --- Funciones de control ---
+
+void activarMotorDC() {
+  digitalWrite(IN1_motor, HIGH);
+  digitalWrite(IN2_motor, LOW);
+  analogWrite(ENA_motor, 255); // Velocidad máxima
+}
+
+void detenerMotorDC() {
+  digitalWrite(IN1_motor, LOW);
+  digitalWrite(IN2_motor, LOW);
+  analogWrite(ENA_motor, 0);
+}
+
+void activarBombaAgua() {
+  digitalWrite(IN1_bomba, HIGH);
+  digitalWrite(IN2_bomba, LOW);
+  analogWrite(ENA_bomba, 255);
+}
+
+void detenerBombaAgua() {
+  digitalWrite(IN1_bomba, LOW);
+  digitalWrite(IN2_bomba, LOW);
+  analogWrite(ENA_bomba, 0);
+}
+
+// --- Funciones de procesos ---
+
+void procesoLlenado() {
+  detenerMotorDC();
+  delay(TIEMPO_ESPERA_SENSOR);
+
+  Serial.println("Llenando botella...");
+  activarBombaAgua();
+  delay(TIEMPO_LLENADO);
+
+  Serial.println("Deteniendo bomba...");
+  detenerBombaAgua();
+  delay(TIEMPO_POST_LLENADO);
+
+  Serial.println("Reactivando cinta...");
+  activarMotorDC();
+}
+
+void esperarSensorFinal() {
+  Serial.println("Esperando detección en Sensor 2...");
+  while (!digitalRead(sensor2) == LOW) {
+    delay(50); // Espera sin bloquear mucho
+  }
+
+  Serial.println("Objeto llegó al final.");
+  detenerMotorDC();
+  delay(TIEMPO_POST_SENSOR2);
+}
